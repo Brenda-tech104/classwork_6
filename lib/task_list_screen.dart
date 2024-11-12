@@ -1,11 +1,11 @@
-import 'package:class_work6/login_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'nested_task_screen.dart';
+import 'login_screen.dart';
 
 class TaskListScreen extends StatefulWidget {
-  const TaskListScreen({super.key});
+  const TaskListScreen({Key? key}) : super(key: key);
 
   @override
   State<TaskListScreen> createState() => _TaskListScreenState();
@@ -65,13 +65,14 @@ class _TaskListScreenState extends State<TaskListScreen> {
                 IconButton(
                   icon: const Icon(Icons.add),
                   onPressed: _addTask,
-                )
+                ),
               ],
             ),
           ),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: tasksRef.orderBy('priority').snapshots(),
+              stream:
+                  tasksRef.orderBy('timestamp', descending: true).snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -81,18 +82,27 @@ class _TaskListScreenState extends State<TaskListScreen> {
                   itemCount: tasks.length,
                   itemBuilder: (context, index) {
                     final task = tasks[index];
-                    return ListTile(
-                      title: Text(task['name']),
-                      subtitle: Text('Priority: ${task['priority']}'),
-                      leading: Checkbox(
-                        value: task['completed'],
-                        onChanged: (value) {
-                          _toggleCompletion(task.id, value!);
-                        },
+                    return Dismissible(
+                      key: Key(task.id),
+                      direction: DismissDirection.endToStart,
+                      onDismissed: (direction) {
+                        _deleteTask(task.id);
+                      },
+                      background: Container(
+                        color: Colors.red,
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.symmetric(horizontal: 10.0),
+                        child: const Icon(Icons.delete, color: Colors.white),
                       ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete),
-                        onPressed: () => _deleteTask(task.id),
+                      child: ListTile(
+                        title: Text(task['name']),
+                        subtitle: Text('Priority: ${task['priority']}'),
+                        leading: Checkbox(
+                          value: task['completed'],
+                          onChanged: (value) {
+                            _toggleCompletion(task.id, value!);
+                          },
+                        ),
                       ),
                     );
                   },
@@ -122,8 +132,12 @@ class _TaskListScreenState extends State<TaskListScreen> {
         'name': taskName,
         'completed': false,
         'priority': _selectedPriority,
+        'timestamp': FieldValue.serverTimestamp(),
       });
       _taskController.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Task added!')),
+      );
     }
   }
 
@@ -133,5 +147,8 @@ class _TaskListScreenState extends State<TaskListScreen> {
 
   void _deleteTask(String taskId) {
     tasksRef.doc(taskId).delete();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Task deleted')),
+    );
   }
 }
